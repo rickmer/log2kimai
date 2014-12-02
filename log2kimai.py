@@ -8,6 +8,8 @@ from cookielib import CookieJar
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser, Error as ConfigParserError
 from datetime import datetime, timedelta
+from re import search, sub
+from sys import stdin
 
 class kimaiMessage(object):
     """
@@ -20,14 +22,26 @@ class kimaiMessage(object):
         self.baseurl = baseurl
         self.user = user
         self.passwd = passwd
-
+        
+        # get authentication cookie
         cookiejar = CookieJar()
         opener = build_opener(HTTPCookieProcessor(cookiejar), HTTPHandler())
         url = ''.join([self.baseurl, '/index.php?a=checklogin'])
         postdata = urlencode({'name':self.user, 'password':self.passwd})
         request = Request(url, postdata)          
-        opener.open(request)
+        result = opener.open(request)
         self.session = opener
+        
+        #extract user id from request body
+        for line in result:
+            if search(r"userID", line):
+                self.userid = sub(r'^.*([0-9]{9}).*\n$', r'\1', line)
+                break
+        try:
+            self.userid
+        except:
+            exit("userID was not found")
+
 
     def __del__(self):
         """
@@ -36,7 +50,7 @@ class kimaiMessage(object):
         url = ''.join([self.baseurl, '/index.php?a=logout'])          
         self.session.open(Request(url))
 
-    def logWork(self, start, end, pid, aid, userid='134117316', comment='', description=''):
+    def logWork(self, start, end, pid, aid, comment='', descr=''):
         """
         log work
         """ 
@@ -54,7 +68,7 @@ class kimaiMessage(object):
                                 'projectID':pid,
                                 'filter':'',
                                 'activityID':aid,
-                                'description':'',
+                                'description':descr,
                                 'start_day':param_start_date,
                                 'end_day':param_end_date,
                                 'start_time':param_start_time,
@@ -62,9 +76,9 @@ class kimaiMessage(object):
                                 'duration':param_duration,
                                 'location':'',
                                 'trackingNumber':'',
-                                'comment':'',
+                                'comment':comment,
                                 'commentType':0,
-                                'userID[]':userid,
+                                'userID[]':self.userid,
                                 'budget':'',
                                 'approved':'',
                                 'statusID':1,
@@ -86,17 +100,51 @@ def main():
     except IOError:
         exit('Error: Specified config file was not found or not readable.')
 
-    try:
-        datetime_start = datetime.strptime('141201-0710', '%y%m%d-%H%M')
-    except ValueError:
-        exit('Error parsing start date (format is supposed to be YYYYmmdd-HHmm)')
+    add_list = []
+    
+    # read and validate stdin  
+    line_counter = 0
+    for line in stdin.readlines():
+        line_counter += 1
+        line = sub(r'\n', r'', ''.join(line))
+        input_list = line.split('|')
+        # validate number of arguments per line
+        if len(input_list) != 5:
+            print ' '.join(['error parsing stdin line', str(line_counter)])
+        
+        # validate startdate
+        try:
+            datetime_start = datetime.strptime(input_list[0], '%y%m%d-%H%M')
+        except ValueError:
+            exit(' '.join(['Error parsing start date (format is supposed to be YYYYmmdd-HHmm)', str(line_counter)]))
+
+        # validate duration 
+        try:
+            datetime_end = datetime_start + timedelta(minutes=+int(input_list[1]))
+        except ValueError:
+            exit(' '.join(['Error parsing duration (supposed to be an integer) in line', str(line_counter)]))
+
+        # validate project id
+        try:
+            project_id = int(input_list[2])
+        except ValueError:
+            exit(' '.join(['Error parsing project_id (supposed to be an integer) in line', str(line_counter)]))
+        
+        # validate activity id
+        try:
+            activity_id = int(input_list[3])
+        except ValueError: 
+            exit(' '.join(['Error parsing activity_id (supposed to be an integer) in line', str(line_counter)]))
+        
+        comment = input_list[4]
+        add_list.append((datetime_start, datetime_end, project_id, activity_id, comment)) 
+        
 
     km = kimaiMessage(config_file.get('kimai','baseurl'), 
                       config_file.get('kimai', 'user'), 
                       config_file.get('kimai', 'pass'))
-    datetime_end = datetime_start + timedelta(minutes=+5)
-    km.logWork(datetime_start, datetime_end, 1, 1)
-
-
+    for (start, end, pid, aid, comment) in add_list:
+        km.logWork(start, end, pid, aid, comment)
+    
 if __name__ == "__main__":
     main()
