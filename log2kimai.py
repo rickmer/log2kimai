@@ -15,14 +15,21 @@ class kimaiMessage(object):
     """
     The Message Object
     """
-    def __init__(self, baseurl, user, passwd):
+    def __init__(self, baseurl, user, passwd, version):
         """
         message constructor
         """
+        supported_verions = {'0.9.2.1306':0, 
+                             '0.9.3.1384':1}
+
         self.baseurl = baseurl
         self.user = user
         self.passwd = passwd
-        
+        try:
+            self.request_type = supported_verions[version] 
+        except:
+            exit('this version of kimai is currently not supported')
+
         # get authentication cookie
         cookiejar = CookieJar()
         opener = build_opener(HTTPCookieProcessor(cookiejar), HTTPHandler())
@@ -34,7 +41,7 @@ class kimaiMessage(object):
         
         #extract user id from result body
         for line in result:
-            if search(r"userID", line):
+            if search(r"userID|usr_ID", line):
                 self.userid = sub(r'^.*([0-9]{9}).*\n$', r'\1', line)
                 break
         try:
@@ -46,16 +53,34 @@ class kimaiMessage(object):
         self.projects = {}
         self.activity = {}
         for line in result:
-            if search(r'buzzer_preselect_project\(', line):
-                match = sub(r".*buzzer_preselect_project\(([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
-                (idnum, name) = tuple(match.split(','))
-                if not self.projects.has_key(int(idnum)):
-                    self.projects[int(idnum)] = name
-            elif search(r'buzzer_preselect_activity\(', line):
-                match = sub(r".*buzzer_preselect_activity\(([0-9]{1,}),'(.*)'\).*\n", r'\1,\2', line)
-                (idnum, name) = tuple(match.split(','))
-                if not self.activity.has_key(int(idnum)):
-                    self.activity[int(idnum)] = name
+            
+            if self.request_type == 1:
+                
+                if search(r'buzzer_preselect_project\(', line):
+                    match = sub(r".*buzzer_preselect_project\(([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
+                    (idnum, name) = tuple(match.split(','))
+                    if not self.projects.has_key(int(idnum)):
+                        self.projects[int(idnum)] = name
+                
+                elif search(r'buzzer_preselect_activity\(', line):
+                    match = sub(r".*buzzer_preselect_activity\(([0-9]{1,}),'(.*)'\).*\n", r'\1,\2', line)
+                    (idnum, name) = tuple(match.split(','))
+                    if not self.activity.has_key(int(idnum)):
+                        self.activity[int(idnum)] = name
+            
+            elif self.request_type == 0:
+            
+                if search(r"buzzer_preselect\('pct", line):
+                    match = sub(r".*buzzer_preselect\('pct',([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
+                    (idnum, name) = tuple(match.split(','))
+                    if not self.projects.has_key(int(idnum)):
+                        self.projects[int(idnum)] = name
+                
+                elif search(r"buzzer_preselect\('evt", line):
+                    match = sub(r".*buzzer_preselect\('evt',([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
+                    (idnum, name) = tuple(match.split(','))
+                    if not self.activity.has_key(int(idnum)):
+                        self.activity[int(idnum)] = name
 
     def __del__(self):
         """
@@ -77,28 +102,45 @@ class kimaiMessage(object):
         minutes, seconds = divmod(remainder, 60)
         param_duration = ':'.join([str(hours).zfill(2), str(minutes).zfill(2), str(seconds).zfill(2)]) 
         url = ''.join([self.baseurl, '/extensions/ki_timesheets/processor.php'])
-        postdata = urlencode({  'id':'',
-                                'axAction':'add_edit_timeSheetEntry',
-                                'projectID':pid,
-                                'filter':'',
-                                'activityID':aid,
-                                'description':descr,
-                                'start_day':param_start_date,
-                                'end_day':param_end_date,
-                                'start_time':param_start_time,
-                                'end_time':param_end_time,
-                                'duration':param_duration,
-                                'location':'',
-                                'trackingNumber':'',
-                                'comment':comment,
-                                'commentType':0,
-                                'userID[]':self.userid,
-                                'budget':'',
-                                'approved':'',
-                                'statusID':1,
-                                'billable':0,
-                                'rate':'',
-                                'fixedRate':''})
+        if self.request_type == 0:
+            postdata = urlencode({  'id': '0',
+                                    'axAction': 'add_edit_record',
+                                    'pct_ID': pid,
+                                    'filter': '',
+                                    'evt_ID': aid,
+                                    'filter': '',
+                                    'edit_in_day': param_start_date,
+                                    'edit_out_day': param_end_date,
+                                    'edit_in_time': param_start_time,
+                                    'edit_out_time': param_end_time,
+                                    'edit_duration': param_duration,
+                                    'zlocation': '',
+                                    'trackingnr': '',
+                                    'comment': comment,
+                                    'comment_type': '0'})
+        elif self.request_type == 1:
+            postdata = urlencode({  'id':'',
+                                    'axAction':'add_edit_timeSheetEntry',
+                                    'projectID':pid,
+                                    'filter':'',
+                                    'activityID':aid,
+                                    'description':descr,
+                                    'start_day':param_start_date,
+                                    'end_day':param_end_date,
+                                    'start_time':param_start_time,
+                                    'end_time':param_end_time,
+                                    'duration':param_duration,
+                                    'location':'',
+                                    'trackingNumber':'',
+                                    'comment':comment,
+                                    'commentType':0,
+                                    'userID[]':self.userid,
+                                    'budget':'',
+                                    'approved':'',
+                                    'statusID':1,
+                                    'billable':0,
+                                    'rate':'',
+                                    'fixedRate':''})
         request = Request(url, postdata)          
         self.session.open(request)
 
@@ -122,7 +164,8 @@ def main():
     if len(cmd_args.action) == 2 and cmd_args.action[0] == 'info':
         km = kimaiMessage(config_file.get('kimai','baseurl'), 
                           config_file.get('kimai', 'user'), 
-                          config_file.get('kimai', 'pass'))
+                          config_file.get('kimai', 'pass'),
+                          config_file.get('kimai', 'version'))
         if cmd_args.action[1] == 'activities':
             for key in km.activity:
                 print ' '.join([str(key), ':', km.activity[key]])
@@ -178,11 +221,12 @@ def main():
             if cmd_args.verbose:
                 print (datetime_start, datetime_end, project_id, activity_id, comment)
         
-        if not cmd_args.dry and len(cmd_args.action) > 0 and cmd_args[0] == 'add':
+        if not cmd_args.dry and len(cmd_args.action) > 0 and cmd_args.action[0] == 'add':
             # send requests to log work 
             km = kimaiMessage(config_file.get('kimai','baseurl'), 
                               config_file.get('kimai', 'user'), 
-                              config_file.get('kimai', 'pass'))
+                              config_file.get('kimai', 'pass'),
+                              config_file.get('kimai', 'version'))
             for (start, end, pid, aid, comment) in add_list:
                 km.logWork(start, end, pid, aid, comment)
     else:
