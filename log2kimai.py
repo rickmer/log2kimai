@@ -148,7 +148,7 @@ def main():
     
     # parse commandline arguments
     cmd_parser = ArgumentParser(description='Log Work to a Kimai instance')
-    cmd_parser.add_argument('--configFile', type=str, default='log2kimai.cfg')
+    cmd_parser.add_argument('--configFile', type=str, default='log2kimai.cfg', help='default: log2kimai.cfg')
     cmd_parser.add_argument('-v', '--verbose', action='store_true')
     cmd_parser.add_argument('-d', '--dry', action='store_true', help='dryrun; just validating input')
     cmd_parser.add_argument('action', nargs='+', help='add, info projects/activities')
