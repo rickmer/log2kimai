@@ -25,6 +25,11 @@ optional arguments:
                         default: log2kimai.cfg
   -v, --verbose
   -d, --dry             dryrun; just validating input
+  
+example: echo "151021-1600|120|1|1|comment" | ./log2kimai.py add
+example: cat input.psv | ./log2kimai.py add
+example: ./log2kimai.py info activities
+  
 ```
 
 modul usage
