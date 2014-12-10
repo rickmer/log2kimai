@@ -195,7 +195,7 @@ def main():
             try:
                 datetime_start = datetime.strptime(input_list[0], '%y%m%d-%H%M')
             except ValueError:
-                exit(' '.join(['Error parsing start date (format is supposed to be YYYYmmdd-HHmm)', str(line_counter)]))
+                exit(' '.join(['Error parsing start date (format is supposed to be yymmdd-HHmm)', str(line_counter)]))
 
             # validate duration 
             try:
