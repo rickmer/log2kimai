@@ -1,8 +1,8 @@
-log2kimai
+log2kimai [![Build Status](https://travis-ci.org/rickmer/log2kimai.svg)](https://travis-ci.org/rickmer/log2kimai)
 =========
 
 a python module  / command line tool to log work to a standart Kimai instance via http(s)
-[![Build Status](https://travis-ci.org/rickmer/log2kimai.svg)](https://travis-ci.org/rickmer/log2kimai)
+
 
 supported versions
 ------------------
