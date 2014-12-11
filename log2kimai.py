@@ -1,17 +1,17 @@
-#!/usr/bin/python 
+#!/usr/bin/python
 """
-CommandLine Tool / Modul for Kimai 
+CommandLine Tool / Modul for Kimai
 """
 from urllib import urlencode
 from urllib2 import Request, build_opener, HTTPCookieProcessor, HTTPHandler
 from cookielib import CookieJar
 from argparse import ArgumentParser
-from ConfigParser import ConfigParser, Error as ConfigParserError
+from ConfigParser import ConfigParser
 from datetime import datetime, timedelta
 from re import search, sub
 from sys import stdin
 
-class kimaiMessage(object):
+class KimaiMessage(object):
     """
     The Message Object
     """
@@ -19,26 +19,23 @@ class kimaiMessage(object):
         """
         message constructor
         """
-        supported_verions = {'0.9.2.1306':0, 
+        supported_verions = {'0.9.2.1306':0,
                              '0.9.3.1384':1}
-
         self.baseurl = baseurl
         self.user = user
         self.passwd = passwd
         try:
-            self.request_type = supported_verions[version] 
+            self.request_type = supported_verions[version]
         except:
             exit('this version of kimai is currently not supported')
-
         # get authentication cookie
         cookiejar = CookieJar()
         opener = build_opener(HTTPCookieProcessor(cookiejar), HTTPHandler())
         url = ''.join([self.baseurl, '/index.php?a=checklogin'])
         postdata = urlencode({'name':self.user, 'password':self.passwd})
-        request = Request(url, postdata)          
+        request = Request(url, postdata)
         result = opener.open(request)
         self.session = opener
-        
         #extract user id from result body
         for line in result:
             if search(r"userID|usr_ID", line):
@@ -48,34 +45,27 @@ class kimaiMessage(object):
             self.userid
         except:
             exit("userID was not found")
-
         #extract project and activities dicts from result body
         self.projects = {}
         self.activity = {}
         for line in result:
-            
             if self.request_type == 1:
-                
                 if search(r'buzzer_preselect_project\(', line):
                     match = sub(r".*buzzer_preselect_project\(([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
                     (idnum, name) = tuple(match.split(','))
                     if not self.projects.has_key(int(idnum)):
                         self.projects[int(idnum)] = name
-                
                 elif search(r'buzzer_preselect_activity\(', line):
                     match = sub(r".*buzzer_preselect_activity\(([0-9]{1,}),'(.*)'\).*\n", r'\1,\2', line)
                     (idnum, name) = tuple(match.split(','))
                     if not self.activity.has_key(int(idnum)):
                         self.activity[int(idnum)] = name
-            
             elif self.request_type == 0:
-            
                 if search(r"buzzer_preselect\('pct", line):
                     match = sub(r".*buzzer_preselect\('pct',([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
                     (idnum, name) = tuple(match.split(','))
                     if not self.projects.has_key(int(idnum)):
                         self.projects[int(idnum)] = name
-                
                 elif search(r"buzzer_preselect\('evt", line):
                     match = sub(r".*buzzer_preselect\('evt',([0-9]{1,}),'(.*)',.*\n", r'\1,\2', line)
                     (idnum, name) = tuple(match.split(','))
@@ -86,13 +76,13 @@ class kimaiMessage(object):
         """
         deconstruct Message
         """
-        url = ''.join([self.baseurl, '/index.php?a=logout'])          
+        url = ''.join([self.baseurl, '/index.php?a=logout'])
         self.session.open(Request(url))
 
-    def logWork(self, start, end, pid, aid, comment='', descr=''):
+    def log_work(self, start, end, pid, aid, comment='', descr=''):
         """
         log work
-        """ 
+        """
         param_start_date = start.strftime('%d.%m.%Y')
         param_start_time = start.strftime('%H:%M:%S')
         param_end_date = end.strftime('%d.%m.%Y')
@@ -100,7 +90,7 @@ class kimaiMessage(object):
         time_delta = end - start
         hours, remainder = divmod(time_delta.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
-        param_duration = ':'.join([str(hours).zfill(2), str(minutes).zfill(2), str(seconds).zfill(2)]) 
+        param_duration = ':'.join([str(hours).zfill(2), str(minutes).zfill(2), str(seconds).zfill(2)])
         url = ''.join([self.baseurl, '/extensions/ki_timesheets/processor.php'])
         if self.request_type == 0:
             postdata = urlencode({  'id': '0',
@@ -141,11 +131,13 @@ class kimaiMessage(object):
                                     'billable':0,
                                     'rate':'',
                                     'fixedRate':''})
-        request = Request(url, postdata)          
+        request = Request(url, postdata)
         self.session.open(request)
 
 def main():
-    
+    """
+    main function for command line usage
+    """
     # parse commandline arguments
     cmd_parser = ArgumentParser(description='Log Work to a Kimai instance')
     cmd_parser.add_argument('--configFile', type=str, default='log2kimai.cfg', help='default: log2kimai.cfg')
@@ -154,33 +146,29 @@ def main():
     cmd_parser.add_argument('action', nargs='+', help='add, info projects/activities')
     cmd_args = cmd_parser.parse_args()
     config_file = ConfigParser()
-
     try:
         config_file.readfp(open(cmd_args.configFile))
     except IOError:
         exit('Error: Specified config file was not found or not readable.')
-
     # info mode
     if len(cmd_args.action) == 2 and cmd_args.action[0] == 'info':
-        km = kimaiMessage(config_file.get('kimai','baseurl'), 
-                          config_file.get('kimai', 'user'), 
-                          config_file.get('kimai', 'pass'),
-                          config_file.get('kimai', 'version'))
+        kimai = KimaiMessage(config_file.get('kimai', 'baseurl'),
+                             config_file.get('kimai', 'user'),
+                             config_file.get('kimai', 'pass'),
+                             config_file.get('kimai', 'version'))
         if cmd_args.action[1] == 'activities':
-            for key in km.activity:
-                print ' '.join([str(key), ':', km.activity[key]])
+            for key in kimai.activity:
+                print ' '.join([str(key), ':', kimai.activity[key]])
         elif cmd_args.action[1] == 'projects':
-            for key in km.projects:
-                print ' '.join([str(key), ':', km.projects[key]])
+            for key in kimai.projects:
+                print ' '.join([str(key), ':', kimai.projects[key]])
         exit()
-    elif len(cmd_args.action) == 1 and cmd_args.action[0] == 'add':       
+    elif len(cmd_args.action) == 1 and cmd_args.action[0] == 'add':
         # add mode
-        
         # check stdin
         if stdin.isatty():
             exit()
-
-        # read and validate stdin  
+        # read and validate stdin
         add_list = []
         line_counter = 0
         for line in stdin.readlines():
@@ -190,47 +178,39 @@ def main():
             # validate number of arguments per line
             if len(input_list) != 5:
                 print ' '.join(['error parsing stdin line', str(line_counter)])
-            
             # validate startdate
             try:
                 datetime_start = datetime.strptime(input_list[0], '%y%m%d-%H%M')
             except ValueError:
                 exit(' '.join(['Error parsing start date (format is supposed to be yymmdd-HHmm)', str(line_counter)]))
-
-            # validate duration 
+            # validate duration
             try:
                 datetime_end = datetime_start + timedelta(minutes=+int(input_list[1]))
             except ValueError:
                 exit(' '.join(['Error parsing duration (supposed to be an integer) in line', str(line_counter)]))
-
             # validate project id
             try:
                 project_id = int(input_list[2])
             except ValueError:
                 exit(' '.join(['Error parsing project_id (supposed to be an integer) in line', str(line_counter)]))
-            
             # validate activity id
             try:
                 activity_id = int(input_list[3])
-            except ValueError: 
+            except ValueError:
                 exit(' '.join(['Error parsing activity_id (supposed to be an integer) in line', str(line_counter)]))
-            
             comment = input_list[4]
-            add_list.append((datetime_start, datetime_end, project_id, activity_id, comment)) 
-            
+            add_list.append((datetime_start, datetime_end, project_id, activity_id, comment))
             if cmd_args.verbose:
                 print (datetime_start, datetime_end, project_id, activity_id, comment)
-        
         if not cmd_args.dry and len(cmd_args.action) > 0 and cmd_args.action[0] == 'add':
-            # send requests to log work 
-            km = kimaiMessage(config_file.get('kimai','baseurl'), 
-                              config_file.get('kimai', 'user'), 
-                              config_file.get('kimai', 'pass'),
-                              config_file.get('kimai', 'version'))
+            # send requests to log work
+            kimai = KimaiMessage(config_file.get('kimai', 'baseurl'),
+                                 config_file.get('kimai', 'user'),
+                                 config_file.get('kimai', 'pass'),
+                                 config_file.get('kimai', 'version'))
             for (start, end, pid, aid, comment) in add_list:
-                km.logWork(start, end, pid, aid, comment)
+                kimai.log_work(start, end, pid, aid, comment)
     else:
         cmd_parser.print_usage()
-    
 if __name__ == "__main__":
     main()

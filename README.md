@@ -37,9 +37,9 @@ modul usage
 -----------
 
 ```
-from log2kimai import kimaiMessage
+from log2kimai import KimaiMessage
 
-kimai = kimaiMessage('http://demo.kimai.org', 'admin', 'changeme', '0.9.3.1384')
-kimai.logWork(<datetime_start>, <datetime_end>, <project_id>, <activitie_id>, <comment>)
+kimai = KimaiMessage('http://demo.kimai.org', 'admin', 'changeme', '0.9.3.1384')
+kimai.log_work(<datetime_start>, <datetime_end>, <project_id>, <activitie_id>, <comment>)
 
 ```
